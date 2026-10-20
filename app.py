@@ -56,32 +56,33 @@ if "records" not in st.session_state:st.session_state.records=pd.DataFrame(colum
 if "report" not in st.session_state:st.session_state.report=[]
 df=clean(st.session_state.records)
 @st.cache_data
-def get_2025_olfaction():
+def get_conference_index():
     try:
-        return pd.read_csv("data/olfaction_2025.csv")
+        return pd.read_csv("data/topics_2023_2026.csv").fillna("")
     except (FileNotFoundError, pd.errors.EmptyDataError):
         return pd.DataFrame()
 
-st.header("Explore real conference presentations")
-selected_year=st.selectbox("Meeting year",list(range(2026,1978,-1)),index=1,key="explore_year")
-selected_topic=st.selectbox("Research topic",["Olfaction"],key="explore_topic")
-if selected_year==2025:
-    source_records=get_2025_olfaction()
-    if source_records.empty:
-        st.warning("The 2025 source index is not available yet.")
-    else:
-        st.success(f"{len(source_records)} extracted 2025 olfaction-related title matches from the original AChemS program.")
-        search=st.text_input("Search matching presentation titles or authors",key="olf_search")
-        if search:
-            mask=source_records["title"].str.contains(search,case=False,regex=False,na=False)|source_records["authors"].str.contains(search,case=False,regex=False,na=False)
-            source_records=source_records[mask]
-        for _,item in source_records.iterrows():
-            with st.expander(f"#{item['number']} — {item['title']}"):
-                st.write("**Extracted author line:**",item["authors"])
-                st.caption("Automatically extracted from the 2025 conference program; title and author formatting require verification.")
-                st.link_button("Open original 2025 program and abstracts",item["source"])
+st.header("Explore conference presentations")
+index=get_conference_index()
+if index.empty:
+    st.warning("The presentation index is unavailable.")
 else:
-    st.info("2025 Olfaction is available now. Other years and topics will be added after source extraction and validation.")
+    years=sorted(index.year.unique(),reverse=True)
+    year=st.selectbox("Choose a conference year",years,index=years.index(2025) if 2025 in years else 0,key="explore_year")
+    topic_options=sorted({t.strip() for s in index[index.year==year].topics for t in str(s).split(";") if t.strip()})
+    topic=st.selectbox("Choose a research topic",topic_options,key="explore_topic")
+    matches=index[(index.year==year)&index.topics.map(lambda s:topic in [x.strip() for x in str(s).split(";")])]
+    st.write(f"**{len(matches)} preliminary title matches** for **{topic}** in **{year}**")
+    query=st.text_input("Search presentation titles or author lines",key="explore_search")
+    if query:
+        matches=matches[matches.title.str.contains(query,case=False,regex=False,na=False)|matches.authors.str.contains(query,case=False,regex=False,na=False)]
+    for _,item in matches.iterrows():
+        with st.expander(f"#{item['number']} — {item['title']}"):
+            st.write("**Extracted author line:**",item["authors"])
+            st.write("**Title-based categories:**",item["topics"])
+            st.caption("Automatically extracted; titles, author lines and topic categories require source verification.")
+            st.link_button("Read original conference PDF",item["source"])
+    st.caption("This pilot covers 2023–2026. Earlier years will be added as extraction and quality checks progress. Category overlap is allowed.")
 st.divider()
 
 st.title("🧬 AChemS Research Atlas")
