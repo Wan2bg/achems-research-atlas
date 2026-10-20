@@ -55,6 +55,35 @@ def extract(file):
 if "records" not in st.session_state:st.session_state.records=pd.DataFrame(columns=FIELDS)
 if "report" not in st.session_state:st.session_state.report=[]
 df=clean(st.session_state.records)
+@st.cache_data
+def get_2025_olfaction():
+    try:
+        return pd.read_csv("data/olfaction_2025.csv")
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        return pd.DataFrame()
+
+st.header("Explore real conference presentations")
+selected_year=st.selectbox("Meeting year",list(range(2026,1978,-1)),index=1,key="explore_year")
+selected_topic=st.selectbox("Research topic",["Olfaction"],key="explore_topic")
+if selected_year==2025:
+    source_records=get_2025_olfaction()
+    if source_records.empty:
+        st.warning("The 2025 source index is not available yet.")
+    else:
+        st.success(f"{len(source_records)} extracted 2025 olfaction-related title matches from the original AChemS program.")
+        search=st.text_input("Search matching presentation titles or authors",key="olf_search")
+        if search:
+            mask=source_records["title"].str.contains(search,case=False,regex=False,na=False)|source_records["authors"].str.contains(search,case=False,regex=False,na=False)
+            source_records=source_records[mask]
+        for _,item in source_records.iterrows():
+            with st.expander(f"#{item['number']} — {item['title']}"):
+                st.write("**Extracted author line:**",item["authors"])
+                st.caption("Automatically extracted from the 2025 conference program; title and author formatting require verification.")
+                st.link_button("Open original 2025 program and abstracts",item["source"])
+else:
+    st.info("2025 Olfaction is available now. Other years and topics will be added after source extraction and validation.")
+st.divider()
+
 st.title("🧬 AChemS Research Atlas")
 st.caption("Historical conference research • 1979–2026 • Exploratory research prototype")
 st.info("Charts reflect imported records only, not verified historical findings. PDF extraction yields candidate text that must be checked against the original programs.")
